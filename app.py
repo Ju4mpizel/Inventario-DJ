@@ -3,34 +3,36 @@ import mysql.connector
 from db import conectar
 app = Flask(__name__)
 #READ
+
 @app.route('/')
 def index():
+    #Se realiza la conexion a la base de datos
     mi_conexion = conectar()
     cursor = mi_conexion.cursor(dictionary=True)
     
-    # Capturamos los filtros de la URL
+    # Capturamos los filtros de la URL si la URL es por ejemplo ?=talla o ?=marca
     talla_f = request.args.get('talla')
     marca_f = request.args.get('marca')
     
-    # Consulta base con el JOIN para ver el nombre de la marca
+    #Consulta base con el JOIN para ver el nombre de la marca
     orden_sql = "SELECT p.*, m.nombre_marca FROM poleras p JOIN marcas m ON p.id_marca = m.id_marca"
 
-    # Filtros simples (Si llega talla, filtra por talla. Si llega marca, filtra por marca)
+    #Filtros simples (Si llega talla, filtra por talla. Si llega marca, filtra por marca)
     if talla_f:
         orden_sql += f" WHERE p.talla = '{talla_f}'"
     elif marca_f:
         orden_sql += f" WHERE p.id_marca = {marca_f}"
-    
+    #Ejecutamos la consulta SQL y actualizamos todos los datos
     cursor.execute(orden_sql)
     lista_de_poleras = cursor.fetchall()
     
-    # Necesitamos las marcas para dibujar los botones
+    #Ejecutamos la consulta SQL y actualizamos todos los datos
     cursor.execute("SELECT * FROM marcas")
     lista_marcas = cursor.fetchall()
-    
+    #Cerramos conexion
     cursor.close()
     mi_conexion.close()
-    
+    #Renderizamos en el html
     return render_template('index.html', 
                            poleras=lista_de_poleras, 
                            marcas=lista_marcas, 
@@ -39,133 +41,144 @@ def index():
 
     
 #CREATE
-# RUTA PARA MOSTRAR EL FORMULARIO DE AGREGAR
+
 @app.route('/agregar')
 def vista_agregar():
+    #Se realiza la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor(dictionary=True)
     
-    # Necesitamos traer las marcas de la base de datos para que el usuario elija una
+    #Ejecutamos la consulta SQL y agarramos todas las marcas para que el cliente seleccione en el formulario de agregado
     cursor.execute("SELECT * FROM marcas")
     lista_marcas = cursor.fetchall()
-    
+    #Cerramos conexion
     cursor.close()
     conexion.close()
+    #Renderizamos en el html
     return render_template('create.html', marcas=lista_marcas)
 
-# RUTA PARA GUARDAR LA POLERA (Esta no se ve, solo procesa)
+#Agregar con boton a la base de datos
 @app.route('/guardar_polera', methods=['POST'])
 def guardar():
-    # 1. Recogemos los datos que vienen del formulario
+    #Se toma del create.html y guardamos en variables
     desc = request.form['txtDescripcion']
     talla = request.form['txtTalla']
     precio = request.form['txtPrecio']
     stock = request.form['txtStock']
     marca = request.form['txtMarca']
     
-    # 2. Conectamos y guardamos
+    #Realizamos la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor()
-    
+    #Insertamos en la base de datos con una cadena de orden sql y con los datos que guardamos en variables
     orden_sql = "INSERT INTO poleras (descripcion, talla, precio, stock, id_marca) VALUES (%s, %s, %s, %s, %s)"
     datos = (desc, talla, precio, stock, marca)
-    
+    #Ejecutamos la consulta SQL e insertamos en la base de datos
     cursor.execute(orden_sql, datos)
-    conexion.commit() # Guarda los cambios
-    
+    conexion.commit()
+    #Cerramos conexion
     cursor.close()
     conexion.close()
     
-    # 3. Volvemos al inicio para ver la polera nueva en la lista
+    #Volvemos a la pestaña principal
     return redirect('/')
 
-# RUTA 1: Para ver la ventana de confirmación (GET)
+
+#DELETE
+
+#Saca el id desde la URL y lo uso como parametro de mi funcion
 @app.route('/confirmar_eliminar/<int:id>')
 def vista_eliminar(id):
+    #Se realiza la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor(dictionary=True)
     
-    # Buscamos la polera con un JOIN para mostrar la marca también
+    #Se hace un SELECT para mostrar la info antes de borrar
     consulta = """
         SELECT p.id_polera, p.descripcion, p.talla, p.precio, m.nombre_marca 
         FROM poleras p 
         JOIN marcas m ON p.id_marca = m.id_marca 
         WHERE p.id_polera = %s
     """
+    #Ejecutamos la consulta SQL y seleccionamos los datos a mostrar para confirmar la eliminacion, solo mostramos ese unico
     cursor.execute(consulta, (id,))
     polera_datos = cursor.fetchone()
-    
+    #Cerramos conexion
     cursor.close()
     conexion.close()
+    #Renderizamos en el html
     return render_template('delete.html', p=polera_datos)
-
-# RUTA 2: Para borrar físicamente de la base de datos (POST)
+#Borrar con boton de la base de datos
 @app.route('/ejecutar_eliminar', methods=['POST'])
 def eliminar():
+    #Saca el ID de el delete tomando el id del delete.html
     id_a_borrar = request.form['txtID']
-    
+    #Se realiza la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor()
     
-    # Orden SQL para borrar el registro
+    #Ejecutamos la consulta SQL y eliminamos el dato que seleccionamos
     cursor.execute("DELETE FROM poleras WHERE id_polera = %s", (id_a_borrar,))
-    
-    conexion.commit() # ¡Obligatorio para que MySQL guarde el cambio!
+    #Cerramos conexion
+    conexion.commit()
     conexion.close()
-    
+    #Volvemos a la pagina principal
     return redirect('/')
 
 
-# 1. RUTA PARA MOSTRAR EL FORMULARIO CON DATOS CARGADOS
+#UPDATE
+
+
+#Volvemos a sacar el id de la URL
 @app.route('/editar/<int:id>')
 def vista_editar(id):
+    #Se realiza la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor(dictionary=True)
     
-    # Buscamos la polera específica por su ID
+    #Ejecutamos la consulta SQL y mostramos todos los datos de la polera a actualizar
     cursor.execute("SELECT * FROM poleras WHERE id_polera = %s", (id,))
     polera_actual = cursor.fetchone()
     
-    # Traemos las marcas para que el usuario pueda cambiarla si quiere
+    #Leemos las marcas para que solo pueda seleccionar las existentes en el formulario
     cursor.execute("SELECT * FROM marcas")
     lista_marcas = cursor.fetchall()
-    
+    #Cerramos conexion
     cursor.close()
     conexion.close()
     
-    # Mandamos los datos a la página update.html
+    #Renderizamos en el html
     return render_template('update.html', p=polera_actual, marcas=lista_marcas)
 
-# 2. RUTA PARA PROCESAR EL CAMBIO (UPDATE)
 @app.route('/ejecutar_actualizar', methods=['POST'])
 def actualizar():
-    # Recibimos el ID oculto y los nuevos datos
+    # Recibimos los datos desde update.html
     id_p = request.form['txtID']
     desc = request.form['txtDescripcion']
     talla = request.form['txtTalla']
     precio = request.form['txtPrecio']
     stock = request.form['txtStock']
     marca = request.form['txtMarca']
-    
+    #Se realiza la conexion a base de datos
     conexion = conectar()
     cursor = conexion.cursor()
     
-    # La orden de SQL para actualizar
+    #La consulta SQL para actualizar las lista
     orden_sql = """
         UPDATE poleras 
         SET descripcion=%s, talla=%s, precio=%s, stock=%s, id_marca=%s 
         WHERE id_polera=%s
     """
     datos = (desc, talla, precio, stock, marca, id_p)
-    
+    #Ejecutamos la consulta SQL y se actualiza el producto
     cursor.execute(orden_sql, datos)
-    conexion.commit() # ¡Importante!
-    
+    conexion.commit()
+    #Cerramos conexion
     cursor.close()
     conexion.close()
+    #Volvemos a la pagina principal
     return redirect('/')
 
+#Comando para correr el codigo
 if __name__ == '__main__':
     app.run(debug=True)
-
-#DELETE
