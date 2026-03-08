@@ -47,6 +47,14 @@ class TestInventario(unittest.TestCase):
 
     #DELETE
     @patch("app.conectar")
+    def test_vista_eliminar(self, conectar_falso):
+        cursor_falso = MagicMock()
+        conectar_falso.return_value.cursor.return_value = cursor_falso
+        
+        respuesta = self.navegador.get('/confirmar_eliminar/1')
+        self.assertEqual(respuesta.status_code, 200)
+
+    @patch("app.conectar")
     def test_eliminar(self, conectar_falso):
         bd_falsa = MagicMock()
         cursor_falso = MagicMock()
@@ -60,6 +68,14 @@ class TestInventario(unittest.TestCase):
         bd_falsa.commit.assert_called_once()
 
     #UPDATE
+    @patch("app.conectar")
+    def test_vista_editar(self, conectar_falso):
+        cursor_falso = MagicMock()
+        conectar_falso.return_value.cursor.return_value = cursor_falso
+        
+        respuesta = self.navegador.get('/editar/1')
+        self.assertEqual(respuesta.status_code, 200)
+
     @patch("app.conectar")
     def test_actualizar(self, conectar_falso):
         bd_falsa = MagicMock()
